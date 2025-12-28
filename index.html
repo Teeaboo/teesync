@@ -17,8 +17,10 @@
         
         /* PiP Window: Picture-in-Picture container for the local file */
         #pip-window {
-            position: absolute; top: 40px; right: 40px; 
-            width: 450px; background: #000; border: 2px solid var(--accent); 
+            position: absolute; top: 40px; 
+            left: 40px;        /* Changed from 'right' to 'left' */
+            width: 50vw;       /* Changed from '450px' to 50% of the viewport width */
+            background: #000; border: 2px solid var(--accent); 
             z-index: 100; display: flex; flex-direction: column;
             box-shadow: 0 10px 40px rgba(0,0,0,0.8); touch-action: none;
             /* will-change hints the browser to use GPU acceleration for these properties */
@@ -320,6 +322,7 @@
 </body>
     
 </html>
+
 
 
 
