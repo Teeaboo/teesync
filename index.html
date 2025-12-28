@@ -195,10 +195,49 @@
                 events: { 'onStateChange': onPlayerStateChange }
             });
         }
-
+        
+        // Add Video.js script to the top of your <script> section
+        var vjsScript = document.createElement('script');
+        vjsScript.src = "https://vjs.zencdn.net/8.10.0/video.min.js";
+        document.head.appendChild(vjsScript);
+        
+        let localPlayer; // This will hold the Video.js instance
+        
+        vjsScript.onload = () => {
+            localPlayer = videojs('local-video', {
+                fluid: true,
+                responsive: true
+            });
+        };
+        
+        // Update Local File Loading
+        document.getElementById('local-file').onchange = (e) => {
+            const file = e.target.files[0];
+            const url = URL.createObjectURL(file);
+            localPlayer.src({ type: file.type, src: url });
+        };
+        
+        // Update Subtitle Loading
+        document.getElementById('sub-file').onchange = (e) => {
+            const file = e.target.files[0];
+            const url = URL.createObjectURL(file);
+            localPlayer.addRemoteTextTrack({
+                kind: 'subtitles',
+                src: url,
+                srclang: 'en',
+                label: 'Local Subs',
+                default: true
+            }, false);
+        };
+        
+        // IMPORTANT: Update your SYNC ENGINE loop to use Video.js methods
+        // Replace 'local.currentTime' with 'localPlayer.currentTime()'
+        // Replace 'local.play()' with 'localPlayer.play()'
+        // Replace 'local.pause()' with 'localPlayer.pause()'
         /**
          * State Listener: Responds to Play/Pause/Buffer events from YouTube
          */
+        
         function onPlayerStateChange(event) {
             forceStateSync();
         }
@@ -351,6 +390,7 @@
 </body>
     
 </html>
+
 
 
 
