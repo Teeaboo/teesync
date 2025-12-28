@@ -49,7 +49,29 @@
             z-index: 101; background: var(--panel-bg); padding: 12px 25px; border-radius: 50px;
             display: flex; gap: 20px; align-items: center; border: 1px solid #444; backdrop-filter: blur(10px);
         }
-
+        /* Styling for the toggle button inside the HUD */
+        #hud-toggle {
+            background: none;
+            border: 1px solid #444;
+            color: var(--accent);
+            padding: 4px 8px;
+            font-size: 10px;
+            margin-left: 10px;
+            border-radius: 4px;
+        }
+        
+        #hud-toggle:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        /* Class to hide content but keep the bar visible as a small pill */
+        .minimized #hud-content {
+            display: none !important;
+        }
+        
+        .minimized {
+            padding: 8px 12px !important; /* Shrink the bar size */
+        }
         button { cursor: pointer; border: none; font-weight: bold; background: var(--accent); color: #000; padding: 8px 16px; border-radius: 20px; }
         .nudge { background: #333; color: white; padding: 5px 10px; font-size: 11px; }
         /* New utility class to hide the HUD */
@@ -92,16 +114,19 @@
     </div>
 
     <div id="hud">
-        <input type="text" id="yt-url" placeholder="YouTube ID or URL" style="width: 140px;">
-        <button onclick="initMaster()">LOAD MASTER</button>
-        <input type="file" id="local-file" accept="video/*">
-        <input type="number" id="offset" value="0" step="0.001" style="width: 80px;">
-        <div style="display:flex; gap:2px;">
-            <button class="nudge" onclick="adjustOffset(-0.005)">-5ms</button>
-            <button class="nudge" onclick="adjustOffset(0.005)">+5ms</button>
-        </div>
+        <span id="hud-content">
+            <input type="text" id="yt-url" placeholder="YouTube ID or URL" style="width: 140px;">
+            <button onclick="initMaster()">LOAD MASTER</button>
+            <input type="file" id="local-file" accept="video/*">
+            <input type="number" id="offset" value="0" step="0.001" style="width: 80px;">
+            <div style="display:inline-flex; gap:2px; vertical-align: middle;">
+                <button class="nudge" onclick="adjustOffset(-0.005)">-5ms</button>
+                <button class="nudge" onclick="adjustOffset(0.005)">+5ms</button>
+            </div>
+        </span>
+        
+        <button id="hud-toggle" onclick="toggleHUD()">HIDE</button>
     </div>
-      <button id="hud-toggle-btn" onclick="toggleHUD()" title="Toggle Controls">⚙️</button>
 
     <script>
         /**
@@ -271,21 +296,23 @@
             el.value = (parseFloat(el.value) + amt).toFixed(3);
         }
         /**
-         * Toggles the visibility of the HUD control bar
+         * Toggles the HUD between full controls and a minimized "Show" button.
          */
         function toggleHUD() {
             const hud = document.getElementById('hud');
-            hud.classList.toggle('hidden');
+            const btn = document.getElementById('hud-toggle');
             
-            // Optional: Update the toggle button appearance
-            const btn = document.getElementById('hud-toggle-btn');
-            btn.style.opacity = hud.classList.contains('hidden') ? '0.5' : '1';
+            const isMinimized = hud.classList.toggle('minimized');
+            
+            // Update the button text based on state
+            btn.innerText = isMinimized ? 'SHOW CONTROLS' : 'HIDE';
         }
     </script>
 
 </body>
     
 </html>
+
 
 
 
