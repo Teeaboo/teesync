@@ -2,15 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>SyncLink Pro - v1.5 Stable Sync</title>
+    <title>SyncLink Pro - v1.6 Gatekeeper</title>
     <style>
         :root { --accent: #00ff88; --panel-bg: rgba(15, 15, 15, 0.95); }
         body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; background: #000; font-family: sans-serif; overflow: hidden; color: white; }
         #youtube-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
         #pip-window {
-            position: absolute; top: 40px; right: 40px;
-            width: 450px; background: #000; border: 2px solid var(--accent); 
-            z-index: 100; display: flex; flex-direction: column;
+            position: absolute; top: 40px; right: 40px; width: 450px; background: #000; 
+            border: 2px solid var(--accent); z-index: 100; display: flex; flex-direction: column;
             box-shadow: 0 10px 40px rgba(0,0,0,0.8); overflow: hidden; touch-action: none;
         }
         #pip-header { background: var(--accent); color: #000; font-size: 10px; font-weight: bold; padding: 6px 12px; cursor: grab; user-select: none; display: flex; justify-content: space-between; }
@@ -23,6 +22,7 @@
         button { cursor: pointer; border: none; font-weight: bold; background: var(--accent); color: #000; padding: 8px 16px; border-radius: 20px; }
         .nudge { background: #333; color: white; padding: 5px 10px; font-size: 11px; }
         input { background: #222; border: 1px solid #444; color: #fff; padding: 8px; border-radius: 5px; }
+        #gate-status { font-size: 9px; font-weight: bold; color: #ff4444; }
     </style>
 </head>
 <body>
@@ -30,7 +30,10 @@
     <div id="youtube-layer"><div id="player"></div></div>
 
     <div id="pip-window">
-        <div id="pip-header"><span>SYNC ACTIVE</span><span id="drift-val">0ms</span></div>
+        <div id="pip-header">
+            <span id="gate-status">WAITING FOR GATE...</span>
+            <span id="drift-val">0ms</span>
+        </div>
         <video id="local-video" preload="auto"></video>
     </div>
 
@@ -38,7 +41,10 @@
         <input type="text" id="yt-url" placeholder="YouTube ID or URL" style="width: 140px;">
         <button onclick="initMaster()">LOAD MASTER</button>
         <input type="file" id="local-file" accept="video/*">
-        <input type="number" id="offset" value="0" step="0.001" style="width: 80px;">
+        <div style="display:flex; flex-direction: column; align-items: center;">
+            <label style="font-size: 9px; color: var(--accent);">OFFSET (SEC)</label>
+            <input type="number" id="offset" value="0" step="0.001" style="width: 80px;">
+        </div>
         <div style="display:flex; gap:2px;">
             <button class="nudge" onclick="adjustOffset(-0.005)">-5ms</button>
             <button class="nudge" onclick="adjustOffset(0.005)">+5ms</button>
@@ -53,6 +59,7 @@
         let player;
         const local = document.getElementById('local-video');
         const pip = document.getElementById('pip-window');
+        const gateStatus = document.getElementById('gate-status');
 
         function initMaster() {
             const val = document.getElementById('yt-url').value;
@@ -67,10 +74,19 @@
             });
         }
 
+        // Handle Event-driven state changes (Clicks on YT player)
         function onPlayerStateChange(event) {
-            // Force local video to match play/pause state immediately on change
-            if (event.data == YT.PlayerState.PLAYING) local.play();
-            else local.pause();
+            if (!player || !player.getCurrentTime) return;
+            
+            const ytTime = player.getCurrentTime();
+            const offset = parseFloat(document.getElementById('offset').value) || 0;
+
+            // Only propagate the play event if we are past the offset
+            if (event.data == YT.PlayerState.PLAYING && ytTime >= offset) {
+                local.play();
+            } else {
+                local.pause();
+            }
         }
 
         document.getElementById('local-file').onchange = (e) => {
@@ -80,7 +96,7 @@
             };
         };
 
-        // --- THE FIXED SYNC ENGINE ---
+        // --- GATEKEEPER SYNC ENGINE ---
         setInterval(() => {
             if (!player || !player.getCurrentTime || !local.src || local.readyState < 2) return;
 
@@ -89,33 +105,39 @@
             const offset = parseFloat(document.getElementById('offset').value) || 0;
             const target = ytTime - offset;
 
-            // 1. Position Sync (Handling Seeks and Drift)
-            if (target >= 0) {
-                const drift = local.currentTime - target;
-                document.getElementById('drift-val').innerText = `${Math.round(drift * 1000)}ms`;
-
-                // If drift > 150ms OR if the local video has stopped but YT is playing
-                if (Math.abs(drift) > 0.150) {
-                    local.currentTime = target;
-                }
-            } else {
-                local.currentTime = 0;
-                local.pause();
+            // 1. GATE CHECK
+            if (target < 0) {
+                // BEFORE GATE: Force reset and pause
+                if (local.currentTime !== 0) local.currentTime = 0;
+                if (!local.paused) local.pause();
+                
+                gateStatus.innerText = "GATE LOCKED (T-" + Math.abs(target).toFixed(1) + "s)";
+                gateStatus.style.color = "#ff4444";
+                return; // Exit loop early
             }
 
-            // 2. State Sync (The "Buffering" Fix)
-            // If YouTube is playing but local is stuck (often after a seek), force play.
-            if (ytState === YT.PlayerState.PLAYING && local.paused && target >= 0) {
+            // 2. AFTER GATE: Normal Sync Logic
+            gateStatus.innerText = "GATE OPEN (SYNCING)";
+            gateStatus.style.color = "#00ff88";
+
+            const drift = local.currentTime - target;
+            document.getElementById('drift-val').innerText = `${Math.round(drift * 1000)}ms`;
+
+            // Drift Snap
+            if (Math.abs(drift) > 0.150) {
+                local.currentTime = target;
+            }
+
+            // Playback state matching
+            if (ytState === YT.PlayerState.PLAYING && local.paused) {
                 local.play();
-            } 
-            // If YouTube is paused/buffering but local is still running, force pause.
-            else if ((ytState === YT.PlayerState.PAUSED || ytState === YT.PlayerState.BUFFERING) && !local.paused) {
+            } else if ((ytState === YT.PlayerState.PAUSED || ytState === YT.PlayerState.BUFFERING) && !local.paused) {
                 local.pause();
             }
 
-        }, 200); // Increased frequency to 200ms for tighter seek-detection
+        }, 200);
 
-        // Smooth Drag
+        // Smooth Drag handle
         let isDragging = false, startX, startY, initialX, initialY;
         const header = document.getElementById('pip-header');
         header.onmousedown = (e) => {
@@ -130,10 +152,11 @@
         };
         document.onmouseup = () => isDragging = false;
 
-        // Spacebar
+        // Unified Spacebar
         window.onkeydown = (e) => {
             if (e.code === 'Space') {
                 e.preventDefault();
+                if (!player) return;
                 const state = player.getPlayerState();
                 if (state === YT.PlayerState.PLAYING) player.pauseVideo();
                 else player.playVideo();
