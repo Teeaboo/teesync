@@ -100,6 +100,7 @@
             <button class="nudge" onclick="adjustOffset(-0.005)">-5ms</button>
             <button class="nudge" onclick="adjustOffset(0.005)">+5ms</button>
         </div>
+      <button id="hud-toggle-btn" onclick="toggleHUD()" title="Toggle Controls">⚙️</button>
     </div>
 
     <script>
@@ -281,8 +282,9 @@
             btn.style.opacity = hud.classList.contains('hidden') ? '0.5' : '1';
         }
     </script>
-  <button id="hud-toggle-btn" onclick="toggleHUD()" title="Toggle Controls">⚙️</button>
+
 </body>
     
 </html>
+
 
