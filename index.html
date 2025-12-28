@@ -2,20 +2,18 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>SyncLink Pro - v1.7 Resizable</title>
+    <title>SyncLink Pro - v1.8 Smooth Playback</title>
     <style>
         :root { --accent: #00ff88; --panel-bg: rgba(15, 15, 15, 0.95); }
         body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; background: #000; font-family: sans-serif; overflow: hidden; color: white; }
         #youtube-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
         
-        /* The PiP Window */
         #pip-window {
             position: absolute; top: 40px; right: 40px; 
-            width: 450px; /* Initial Width */
-            background: #000; border: 2px solid var(--accent); 
+            width: 450px; background: #000; border: 2px solid var(--accent); 
             z-index: 100; display: flex; flex-direction: column;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.8); 
-            touch-action: none;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8); touch-action: none;
+            will-change: transform, width, height; /* Optimization for browser rendering */
         }
 
         #pip-header { 
@@ -26,7 +24,6 @@
 
         #local-video { width: 100%; height: auto; display: block; pointer-events: none; }
 
-        /* Resize Handle */
         #resize-handle {
             position: absolute; bottom: 0; right: 0;
             width: 20px; height: 20px;
@@ -42,7 +39,6 @@
         button { cursor: pointer; border: none; font-weight: bold; background: var(--accent); color: #000; padding: 8px 16px; border-radius: 20px; }
         .nudge { background: #333; color: white; padding: 5px 10px; font-size: 11px; }
         input { background: #222; border: 1px solid #444; color: #fff; padding: 8px; border-radius: 5px; }
-        #gate-status { font-size: 9px; font-weight: bold; color: #333; }
     </style>
 </head>
 <body>
@@ -78,6 +74,7 @@
         const local = document.getElementById('local-video');
         const pip = document.getElementById('pip-window');
         const gateStatus = document.getElementById('gate-status');
+        const driftDisplay = document.getElementById('drift-val');
 
         function initMaster() {
             const val = document.getElementById('yt-url').value;
@@ -92,39 +89,27 @@
         }
 
         function onPlayerStateChange(event) {
-            const ytTime = player.getCurrentTime();
-            const offset = parseFloat(document.getElementById('offset').value) || 0;
-            if (event.data == YT.PlayerState.PLAYING && ytTime >= offset) local.play();
-            else local.pause();
+            forceStateSync();
         }
 
         document.getElementById('local-file').onchange = (e) => {
             local.src = URL.createObjectURL(e.target.files[0]);
         };
 
-        // --- INTERACTION LOGIC (DRAG & RESIZE) ---
-        let isDragging = false;
-        let isResizing = false;
-        let startX, startY, startW, startH, initialX, initialY;
+        // --- OPTIMIZED INTERACTION ---
+        let isDragging = false, isResizing = false;
+        let startX, startY, startW, initialX, initialY;
 
-        // Drag Handler
         const header = document.getElementById('pip-header');
         header.onmousedown = (e) => {
-            isDragging = true;
-            startX = e.clientX; startY = e.clientY;
+            isDragging = true; startX = e.clientX; startY = e.clientY;
             initialX = pip.offsetLeft; initialY = pip.offsetTop;
             header.style.cursor = 'grabbing';
         };
 
-        // Resize Handler
         const resizer = document.getElementById('resize-handle');
         resizer.onmousedown = (e) => {
-            e.preventDefault();
-            isResizing = true;
-            startX = e.clientX;
-            startW = pip.offsetWidth;
-            // Capture aspect ratio at start of resize
-            this.aspect = local.videoWidth / local.videoHeight || (16/9);
+            e.preventDefault(); isResizing = true; startX = e.clientX; startW = pip.offsetWidth;
         };
 
         document.onmousemove = (e) => {
@@ -135,47 +120,75 @@
             }
             if (isResizing) {
                 const newWidth = startW + (e.clientX - startX);
-                if (newWidth > 150) { // Minimum size check
-                    pip.style.width = newWidth + 'px';
-                }
+                if (newWidth > 150) pip.style.width = newWidth + 'px';
             }
         };
 
         document.onmouseup = () => {
-            isDragging = false;
-            isResizing = false;
-            header.style.cursor = 'grab';
+            isDragging = false; isResizing = false; header.style.cursor = 'grab';
         };
 
-        // --- SYNC ENGINE ---
+        // --- HIGH PERFORMANCE SYNC LOGIC ---
+        const DRIFT_THRESHOLD = 0.250; // Only force jump if drift > 250ms
+        const SYNC_INTERVAL = 300;     // Polling freq reduced to 300ms
+
+        function forceStateSync() {
+            if (!player || !player.getPlayerState) return;
+            const ytState = player.getPlayerState();
+            const ytTime = player.getCurrentTime();
+            const offset = parseFloat(document.getElementById('offset').value) || 0;
+            
+            if (ytTime < offset) {
+                local.pause();
+                local.currentTime = 0;
+            } else if (ytState === YT.PlayerState.PLAYING) {
+                local.play();
+            } else {
+                local.pause();
+            }
+        }
+
         setInterval(() => {
             if (!player || !player.getCurrentTime || !local.src || local.readyState < 2) return;
+
             const ytTime = player.getCurrentTime();
             const ytState = player.getPlayerState();
             const offset = parseFloat(document.getElementById('offset').value) || 0;
             const target = ytTime - offset;
 
             if (target < 0) {
-                if (local.currentTime !== 0) local.currentTime = 0;
-                if (!local.paused) local.pause();
                 gateStatus.innerText = "LOCKED";
+                if (!local.paused) local.pause();
+                local.currentTime = 0;
                 return;
             }
 
             gateStatus.innerText = "SYNCED";
             const drift = local.currentTime - target;
-            document.getElementById('drift-val').innerText = `${Math.round(drift * 1000)}ms`;
+            
+            // UI Update only (Smooth)
+            requestAnimationFrame(() => {
+                driftDisplay.innerText = `${Math.round(drift * 1000)}ms`;
+            });
 
-            if (Math.abs(drift) > 0.150) local.currentTime = target;
-            if (ytState === YT.PlayerState.PLAYING && local.paused) local.play();
-            else if ((ytState === YT.PlayerState.PAUSED || ytState === YT.PlayerState.BUFFERING) && !local.paused) local.pause();
-        }, 200);
+            // LOGIC: Only "Snap" if drift is extreme or state is mismatched
+            // This prevents the constant micro-seeking that causes stuttering.
+            if (Math.abs(drift) > DRIFT_THRESHOLD) {
+                local.currentTime = target;
+            }
+
+            // Sync State (Play/Pause)
+            if (ytState === YT.PlayerState.PLAYING && local.paused) {
+                local.play();
+            } else if ((ytState === YT.PlayerState.PAUSED || ytState === YT.PlayerState.BUFFERING) && !local.paused) {
+                local.pause();
+            }
+        }, SYNC_INTERVAL);
 
         window.onkeydown = (e) => {
             if (e.code === 'Space') {
                 e.preventDefault();
-                const state = player.getPlayerState();
-                if (state === YT.PlayerState.PLAYING) player.pauseVideo();
+                if (player.getPlayerState() === YT.PlayerState.PLAYING) player.pauseVideo();
                 else player.playVideo();
             }
         };
