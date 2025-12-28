@@ -52,6 +52,29 @@
 
         button { cursor: pointer; border: none; font-weight: bold; background: var(--accent); color: #000; padding: 8px 16px; border-radius: 20px; }
         .nudge { background: #333; color: white; padding: 5px 10px; font-size: 11px; }
+        /* New utility class to hide the HUD */
+        .hidden { 
+            display: none !important; 
+        }
+        
+        /* Styling for the persistent toggle button */
+        #hud-toggle-btn {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            z-index: 102; /* Sits above both layers and HUD */
+            background: rgba(0, 0, 0, 0.5);
+            color: var(--accent);
+            border: 1px solid var(--accent);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
         input { background: #222; border: 1px solid #444; color: #fff; padding: 8px; border-radius: 5px; }
     </style>
 </head>
@@ -246,6 +269,20 @@
             const el = document.getElementById('offset');
             el.value = (parseFloat(el.value) + amt).toFixed(3);
         }
+        /**
+         * Toggles the visibility of the HUD control bar
+         */
+        function toggleHUD() {
+            const hud = document.getElementById('hud');
+            hud.classList.toggle('hidden');
+            
+            // Optional: Update the toggle button appearance
+            const btn = document.getElementById('hud-toggle-btn');
+            btn.style.opacity = hud.classList.contains('hidden') ? '0.5' : '1';
+        }
     </script>
+  <button id="hud-toggle-btn" onclick="toggleHUD()" title="Toggle Controls">⚙️</button>
 </body>
+    
 </html>
+
