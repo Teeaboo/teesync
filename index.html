@@ -2,39 +2,48 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>SyncLink Pro - Hosted Edition</title>
+    <title>SyncLink Pro - Stable Build</title>
     <style>
-        :root { --accent: #00ff88; --panel-bg: rgba(20, 20, 20, 0.9); }
+        :root { --accent: #00ff88; --panel-bg: rgba(15, 15, 15, 0.95); }
         body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; background: #000; font-family: sans-serif; overflow: hidden; color: white; }
 
-        /* Master Player */
-        #youtube-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+        #youtube-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: auto; }
         
-        /* Floating PiP */
+        /* Fixed PiP Window */
         #pip-window {
             position: absolute; top: 40px; right: 40px;
-            width: 450px; background: #000;
-            border: 2px solid var(--accent); z-index: 100;
-            resize: both; overflow: hidden;
-            display: flex; flex-direction: column; cursor: move;
+            width: 450px; 
+            background: #000;
+            border: 2px solid var(--accent); 
+            z-index: 100;
+            display: flex; flex-direction: column;
             box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+            /* Aspect ratio is handled by JS once video loads */
+            overflow: hidden;
+            touch-action: none; /* Prevents browser interference on drag */
         }
-        #local-video { width: 100%; display: block; pointer-events: none; }
 
-        /* HUD */
+        #pip-header {
+            background: var(--accent); color: #000;
+            font-size: 10px; font-weight: bold;
+            padding: 6px 12px; cursor: grab;
+            user-select: none; display: flex; justify-content: space-between;
+        }
+        #pip-header:active { cursor: grabbing; }
+
+        #local-video { width: 100%; height: 100%; display: block; pointer-events: none; object-fit: contain; }
+
         #hud {
             position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
             z-index: 101; background: var(--panel-bg);
-            padding: 15px 25px; border-radius: 50px;
+            padding: 12px 25px; border-radius: 50px;
             display: flex; gap: 20px; align-items: center;
             border: 1px solid #444; backdrop-filter: blur(10px);
         }
 
-        input, button { background: #333; color: white; border: 1px solid #555; padding: 8px 12px; border-radius: 20px; outline: none; }
-        button { cursor: pointer; border: none; font-weight: bold; background: var(--accent); color: #000; }
-        .nudge { background: #444; color: white; padding: 5px 10px; font-size: 11px; }
-        
-        #status-pill { font-size: 10px; padding: 4px 10px; border-radius: 10px; background: #cc0000; color: white; }
+        button { cursor: pointer; border: none; font-weight: bold; background: var(--accent); color: #000; padding: 8px 16px; border-radius: 20px; }
+        .nudge { background: #333; color: white; padding: 5px 10px; font-size: 11px; }
+        input[type="text"] { background: #222; border: 1px solid #444; color: #fff; padding: 8px; border-radius: 5px; width: 140px; }
     </style>
 </head>
 <body>
@@ -42,56 +51,44 @@
     <div id="youtube-layer"><div id="player"></div></div>
 
     <div id="pip-window">
-        <video id="local-video" preload="auto"></video>
-        <div style="background: var(--accent); color: #000; font-size: 10px; padding: 4px 10px; font-weight: bold; display: flex; justify-content: space-between;">
-            <span>LOCAL SLAVE</span>
-            <span id="drift-val">DRIFT: 0ms</span>
+        <div id="pip-header">
+            <span>DRAG HERE</span>
+            <span id="drift-val">0ms</span>
         </div>
+        <video id="local-video" preload="auto"></video>
     </div>
 
     <div id="hud">
-        <div id="status-pill">API DISCONNECTED</div>
-        <input type="text" id="yt-url" placeholder="YouTube URL" style="width: 150px;">
+        <input type="text" id="yt-url" placeholder="YouTube ID or URL">
         <button onclick="initMaster()">LOAD MASTER</button>
-        
-        <input type="file" id="local-file" accept="video/*" style="width: 150px; font-size: 10px;">
-
-        <div style="display:flex; flex-direction: column; align-items: center;">
-            <label style="font-size: 9px; color: #888;">OFFSET (SEC)</label>
-            <input type="number" id="offset" value="0" step="0.1" style="width: 60px;">
+        <input type="file" id="local-file" accept="video/*">
+        <div style="display:flex; align-items: center; gap: 10px;">
+            <label style="font-size: 10px;">OFFSET</label>
+            <input type="number" id="offset" value="0" step="0.001" style="width: 70px; background:#222; color:#fff; border:1px solid #444;">
         </div>
-
-        <div style="display:flex; gap:2px;">
-            <button class="nudge" onclick="adjustOffset(-0.005)">-5ms</button>
-            <button class="nudge" onclick="adjustOffset(0.005)">+5ms</button>
-        </div>
+        <button class="nudge" onclick="adjustOffset(-0.005)">-5ms</button>
+        <button class="nudge" onclick="adjustOffset(0.005)">+5ms</button>
     </div>
 
     <script>
-        // Load YouTube API
+        // 1. API SETUP
         var tag = document.createElement('script');
         tag.src = "https://www.youtube.com/iframe_api";
         document.head.appendChild(tag);
 
         let player;
         const local = document.getElementById('local-video');
-        const status = document.getElementById('status-pill');
-
-        function onYouTubeIframeAPIReady() {
-            status.innerText = "API READY";
-            status.style.background = "#0066ff";
-        }
+        const pip = document.getElementById('pip-window');
 
         function initMaster() {
             const val = document.getElementById('yt-url').value;
             const id = val.match(/[a-zA-Z0-9_-]{11}/);
             if(!id) return;
-
             if(player) player.destroy();
 
             player = new YT.Player('player', {
                 height: '100%', width: '100%', videoId: id[0],
-                playerVars: { 'autoplay': 1, 'controls': 1, 'rel': 0 },
+                playerVars: { 'autoplay': 1, 'controls': 1, 'enablejsapi': 1 },
                 events: {
                     'onStateChange': (e) => {
                         if(e.data == YT.PlayerState.PLAYING) local.play();
@@ -99,21 +96,71 @@
                     }
                 }
             });
-            status.innerText = "CONNECTED";
-            status.style.background = "#00ff88";
-            status.style.color = "#000";
         }
 
+        // 2. ASPECT RATIO LOCKING
         document.getElementById('local-file').onchange = (e) => {
-            local.src = URL.createObjectURL(e.target.files[0]);
+            const file = e.target.files[0];
+            local.src = URL.createObjectURL(file);
+            local.onloadedmetadata = () => {
+                // Lock the PiP window to the video's actual aspect ratio
+                const ratio = local.videoWidth / local.videoHeight;
+                pip.style.aspectRatio = ratio.toString();
+            };
         };
 
+        // 3. SMOOTH DRAG LOGIC
+        let isDragging = false;
+        let startX, startY, initialX, initialY;
+
+        const header = document.getElementById('pip-header');
+        header.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            initialX = pip.offsetLeft;
+            initialY = pip.offsetTop;
+            header.style.cursor = 'grabbing';
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+            pip.style.left = (initialX + dx) + 'px';
+            pip.style.top = (initialY + dy) + 'px';
+            pip.style.right = 'auto'; // Break the initial CSS right-alignment
+        });
+
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+            header.style.cursor = 'grab';
+        });
+
+        // 4. SPACEBAR HANDLING (Unified)
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                // Prevent scrolling
+                e.preventDefault();
+                if (!player || !player.getPlayerState) return;
+                
+                const state = player.getPlayerState();
+                if (state === YT.PlayerState.PLAYING) {
+                    player.pauseVideo();
+                    local.pause();
+                } else {
+                    player.playVideo();
+                    local.play();
+                }
+            }
+        });
+
+        // 5. HEARTBEAT SYNC
         function adjustOffset(amt) {
             const el = document.getElementById('offset');
             el.value = (parseFloat(el.value) + amt).toFixed(3);
         }
 
-        // AUTO-SYNC HEARTBEAT
         setInterval(() => {
             if(player && player.getCurrentTime && local.src) {
                 const ytTime = player.getCurrentTime();
@@ -122,22 +169,11 @@
 
                 if(target > 0) {
                     const drift = local.currentTime - target;
-                    document.getElementById('drift-val').innerText = `DRIFT: ${Math.round(drift * 1000)}ms`;
-                    
-                    // Force re-sync if drift > 150ms
-                    if(Math.abs(drift) > 0.150) {
-                        local.currentTime = target;
-                    }
+                    document.getElementById('drift-val').innerText = `${Math.round(drift * 1000)}ms`;
+                    if(Math.abs(drift) > 0.15) local.currentTime = target;
                 }
             }
         }, 500);
-
-        // DRAG LOGIC
-        const pip = document.getElementById('pip-window');
-        let drag = false, offX, offY;
-        pip.onmousedown = (e) => { if(e.target.tagName === 'INPUT') return; drag = true; offX = pip.offsetLeft - e.clientX; offY = pip.offsetTop - e.clientY; };
-        document.onmousemove = (e) => { if(drag) { pip.style.left = (e.clientX + offX) + 'px'; pip.style.top = (e.clientY + offY) + 'px'; } };
-        document.onmouseup = () => drag = false;
     </script>
 </body>
 </html>
