@@ -4,26 +4,38 @@
     <meta charset="UTF-8">
     <title>SyncLink Pro - v1.8 Smooth Playback</title>
     <style>
+        /* Global variables for easy theme management */
         :root { --accent: #00ff88; --panel-bg: rgba(15, 15, 15, 0.95); }
-        body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; background: #000; font-family: sans-serif; overflow: hidden; color: white; }
+        
+        body, html { 
+            margin: 0; padding: 0; width: 100vw; height: 100vh; 
+            background: #000; font-family: sans-serif; overflow: hidden; color: white; 
+        }
+
+        /* YouTube Layer: Sits at the bottom of the Z-index stack */
         #youtube-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
         
+        /* PiP Window: Picture-in-Picture container for the local file */
         #pip-window {
             position: absolute; top: 40px; right: 40px; 
             width: 450px; background: #000; border: 2px solid var(--accent); 
             z-index: 100; display: flex; flex-direction: column;
             box-shadow: 0 10px 40px rgba(0,0,0,0.8); touch-action: none;
-            will-change: transform, width, height; /* Optimization for browser rendering */
+            /* will-change hints the browser to use GPU acceleration for these properties */
+            will-change: transform, width, height; 
         }
 
+        /* Draggable header area */
         #pip-header { 
             background: var(--accent); color: #000; font-size: 10px; font-weight: bold; 
             padding: 6px 12px; cursor: grab; user-select: none; 
             display: flex; justify-content: space-between;
         }
 
+        /* The local video element itself */
         #local-video { width: 100%; height: auto; display: block; pointer-events: none; }
 
+        /* Custom resize handle positioned at bottom-right */
         #resize-handle {
             position: absolute; bottom: 0; right: 0;
             width: 20px; height: 20px;
@@ -31,11 +43,13 @@
             cursor: nwse-resize; z-index: 102;
         }
 
+        /* HUD: Floating control bar at the bottom */
         #hud {
             position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
             z-index: 101; background: var(--panel-bg); padding: 12px 25px; border-radius: 50px;
             display: flex; gap: 20px; align-items: center; border: 1px solid #444; backdrop-filter: blur(10px);
         }
+
         button { cursor: pointer; border: none; font-weight: bold; background: var(--accent); color: #000; padding: 8px 16px; border-radius: 20px; }
         .nudge { background: #333; color: white; padding: 5px 10px; font-size: 11px; }
         input { background: #222; border: 1px solid #444; color: #fff; padding: 8px; border-radius: 5px; }
@@ -66,6 +80,9 @@
     </div>
 
     <script>
+        /**
+         * INITIALIZATION: YouTube IFrame API Setup
+         */
         var tag = document.createElement('script');
         tag.src = "https://www.youtube.com/iframe_api";
         document.head.appendChild(tag);
@@ -76,6 +93,9 @@
         const gateStatus = document.getElementById('gate-status');
         const driftDisplay = document.getElementById('drift-val');
 
+        /**
+         * Master Player Setup: Inits or replaces the YouTube player
+         */
         function initMaster() {
             const val = document.getElementById('yt-url').value;
             const id = val.match(/[a-zA-Z0-9_-]{11}/);
@@ -88,18 +108,27 @@
             });
         }
 
+        /**
+         * State Listener: Responds to Play/Pause/Buffer events from YouTube
+         */
         function onPlayerStateChange(event) {
             forceStateSync();
         }
 
+        /**
+         * File Selection: Handles loading local video via Blob URL
+         */
         document.getElementById('local-file').onchange = (e) => {
             local.src = URL.createObjectURL(e.target.files[0]);
         };
 
-        // --- OPTIMIZED INTERACTION ---
+        /**
+         * INTERACTION LOGIC: Smooth Dragging and Resizing
+         */
         let isDragging = false, isResizing = false;
         let startX, startY, startW, initialX, initialY;
 
+        // Initialize drag when clicking the header
         const header = document.getElementById('pip-header');
         header.onmousedown = (e) => {
             isDragging = true; startX = e.clientX; startY = e.clientY;
@@ -107,11 +136,13 @@
             header.style.cursor = 'grabbing';
         };
 
+        // Initialize resize when clicking the corner handle
         const resizer = document.getElementById('resize-handle');
         resizer.onmousedown = (e) => {
             e.preventDefault(); isResizing = true; startX = e.clientX; startW = pip.offsetWidth;
         };
 
+        // Unified mouse move handler for both drag and resize
         document.onmousemove = (e) => {
             if (isDragging) {
                 pip.style.left = (initialX + (e.clientX - startX)) + 'px';
@@ -128,10 +159,19 @@
             isDragging = false; isResizing = false; header.style.cursor = 'grab';
         };
 
-        // --- HIGH PERFORMANCE SYNC LOGIC ---
-        const DRIFT_THRESHOLD = 0.250; // Only force jump if drift > 250ms
-        const SYNC_INTERVAL = 300;     // Polling freq reduced to 300ms
+        /**
+         * SYNC ENGINE: High Performance Adaptive Logic
+         */
+        
+        // Adaptive Correction: Only "snap" video if it drifts more than 250ms.
+        // This threshold prevents the micro-stuttering caused by constant seeking.
+        const DRIFT_THRESHOLD = 0.250; 
+        const SYNC_INTERVAL = 300;     // Run sync check 3.3 times per second
 
+        /**
+         * Immediate State Mirroring: Used to jumpstart or pause the local video 
+         * based on the Gatekeeper rules.
+         */
         function forceStateSync() {
             if (!player || !player.getPlayerState) return;
             const ytState = player.getPlayerState();
@@ -148,6 +188,9 @@
             }
         }
 
+        /**
+         * Main Polling Loop: Manages temporal sync and Gatekeeper logic
+         */
         setInterval(() => {
             if (!player || !player.getCurrentTime || !local.src || local.readyState < 2) return;
 
@@ -156,6 +199,7 @@
             const offset = parseFloat(document.getElementById('offset').value) || 0;
             const target = ytTime - offset;
 
+            // Gatekeeper Check: Is YouTube past the sync point?
             if (target < 0) {
                 gateStatus.innerText = "LOCKED";
                 if (!local.paused) local.pause();
@@ -166,18 +210,17 @@
             gateStatus.innerText = "SYNCED";
             const drift = local.currentTime - target;
             
-            // UI Update only (Smooth)
+            // decouple UI updates from core logic for smoother performance
             requestAnimationFrame(() => {
                 driftDisplay.innerText = `${Math.round(drift * 1000)}ms`;
             });
 
-            // LOGIC: Only "Snap" if drift is extreme or state is mismatched
-            // This prevents the constant micro-seeking that causes stuttering.
+            // Temporal Snap: Corrects drift only when threshold is violated
             if (Math.abs(drift) > DRIFT_THRESHOLD) {
                 local.currentTime = target;
             }
 
-            // Sync State (Play/Pause)
+            // State Snap: Ensures play/pause matches regardless of buffering/seeking
             if (ytState === YT.PlayerState.PLAYING && local.paused) {
                 local.play();
             } else if ((ytState === YT.PlayerState.PAUSED || ytState === YT.PlayerState.BUFFERING) && !local.paused) {
@@ -185,14 +228,20 @@
             }
         }, SYNC_INTERVAL);
 
+        /**
+         * UTILITIES: Hotkeys and Fine-Tuning
+         */
+        
+        // Unified Play/Pause via Spacebar
         window.onkeydown = (e) => {
             if (e.code === 'Space') {
-                e.preventDefault();
+                e.preventDefault(); // Prevents page from scrolling
                 if (player.getPlayerState() === YT.PlayerState.PLAYING) player.pauseVideo();
                 else player.playVideo();
             }
         };
 
+        // Offset Fine-tuning
         function adjustOffset(amt) {
             const el = document.getElementById('offset');
             el.value = (parseFloat(el.value) + amt).toFixed(3);
