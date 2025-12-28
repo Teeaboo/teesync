@@ -74,13 +74,29 @@
             background: rgba(255, 255, 255, 0.1);
         }
         
-        /* Class to hide content but keep the bar visible as a small pill */
+        /* Completely strip the HUD container styling when minimized */
+        #hud.minimized {
+            background: none !important;
+            border: none !important;
+            backdrop-filter: none !important;
+            box-shadow: none !important;
+            padding: 0 !important;
+        }
+        
+        /* Ensure the control contents are hidden */
         .minimized #hud-content {
             display: none !important;
         }
         
-        .minimized {
-            /*padding: 8px 12px !important; /* Shrink the bar size */
+        /* Style the toggle button as a standalone floating pill when minimized */
+        .minimized #hud-toggle {
+            background: var(--panel-bg) !important;
+            border: 1px solid #444 !important;
+            padding: 10px 20px !important;
+            border-radius: 20px !important;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5) !important;
+            backdrop-filter: blur(10px) !important;
+            font-size: 11px;
         }
         button { cursor: pointer; border: none; font-weight: bold; background: var(--accent); color: #000; padding: 8px 16px; border-radius: 20px; }
         .nudge { background: #333; color: white; padding: 5px 10px; font-size: 11px; }
@@ -322,6 +338,7 @@
 </body>
     
 </html>
+
 
 
 
