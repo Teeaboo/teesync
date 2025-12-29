@@ -6,7 +6,7 @@
     <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
     <style>
         /* Global variables for easy theme management */
-        :root { --accent: #00ff88; --panel-bg: rgba(15, 15, 15, 0.95); }
+        :root { --accent: #00ff88; --panel-bg: rgba(15, 15, 15, 0.95); --gray: #3D3D3E; }
         
         body, html { 
             margin: 0; padding: 0; width: 100vw; height: 100vh; 
@@ -30,7 +30,7 @@
             position: absolute; top: 40px; 
             left: 40px;        /* Changed from 'right' to 'left' */
             width: 50vw;       /* Changed from '450px' to 50% of the viewport width */
-            background: #000; border: 2px solid #3D3D3E; 
+            background: #000; border: 2px solid var(--gray); 
             z-index: 100; display: flex; flex-direction: column;
             box-shadow: 0 10px 40px rgba(0,0,0,0.8); touch-action: none;
             /* will-change hints the browser to use GPU acceleration for these properties */
@@ -39,7 +39,7 @@
 
         /* Draggable header area */
         #pip-header { 
-            background: var(--accent); color: #000; font-size: 10px; font-weight: bold; 
+            background: var(--gray); color: var(--accent); font-size: 10px; font-weight: bold; 
             padding: 6px 12px; cursor: grab; user-select: none; 
             display: flex; justify-content: space-between;
         }
@@ -51,7 +51,7 @@
         #resize-handle {
             position: absolute; bottom: 0; right: 0;
             width: 20px; height: 20px;
-            background: linear-gradient(135deg, transparent 50%, var(--accent) 50%);
+            background: linear-gradient(135deg, transparent 50%, var(--gray) 50%);
             cursor: nwse-resize; z-index: 102;
         }
 
@@ -388,6 +388,7 @@
 </body>
     
 </html>
+
 
 
 
