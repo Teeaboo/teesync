@@ -57,7 +57,7 @@
 
         /* HUD: Floating control bar at the bottom */
         #hud {
-            position: absolute; bottom: 30px; left: 10%; transform: translateX(-90%);
+            position: absolute; bottom: 30px; left: 10%; transform: translateX(-50%);
             z-index: 101; background: var(--panel-bg); padding: 12px 25px; border-radius: 50px;
             display: flex; gap: 20px; align-items: left; border: none; backdrop-filter: blur(10px);
         }
@@ -150,6 +150,7 @@
     </div>
 
     <div id="hud">
+        <button id="hud-toggle" onclick="toggleHUD()">⚙️</button>
         <span id="hud-content">
             <input type="text" id="yt-url" placeholder="YouTube ID or URL" style="width: 140px;">
             <button onclick="initMaster()">LOAD YOUTUBE</button>
@@ -161,8 +162,6 @@
                 <button class="nudge" onclick="adjustOffset(0.010)">+10ms</button>
             </div>
         </span>
-        
-        <button id="hud-toggle" onclick="toggleHUD()">⚙️</button>
     </div>
 
     <script>
@@ -388,6 +387,7 @@
 </body>
     
 </html>
+
 
 
 
