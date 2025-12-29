@@ -6,7 +6,7 @@
     <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
     <style>
         /* Global variables for easy theme management */
-        :root { --accent: rgba(0, 0, 0, 0.8); --panel-bg: rgba(15, 15, 15, 0.95); }
+        :root { --accent: #00ff88; --panel-bg: rgba(15, 15, 15, 0.95); }
         
         body, html { 
             margin: 0; padding: 0; width: 100vw; height: 100vh; 
@@ -30,7 +30,7 @@
             position: absolute; top: 40px; 
             left: 40px;        /* Changed from 'right' to 'left' */
             width: 50vw;       /* Changed from '450px' to 50% of the viewport width */
-            background: #000; border: 2px solid var(--accent); 
+            background: #000; border: 2px solid rgba(0, 0, 0, 0.8); 
             z-index: 100; display: flex; flex-direction: column;
             box-shadow: 0 10px 40px rgba(0,0,0,0.8); touch-action: none;
             /* will-change hints the browser to use GPU acceleration for these properties */
@@ -390,6 +390,7 @@
 </body>
     
 </html>
+
 
 
 
